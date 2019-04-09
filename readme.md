@@ -1,7 +1,9 @@
 Version: 1.0 by Pandauino.com / Thierry GUENNOU - April 2019
 
 PowMeterNano is a tiny shield that is mounted on top of a Nano board or used as standalone device to monitor 2 power sources (USB and VIN)
+
 USB channel resolution is 25 uA and measures up to 0.5A (or 0.8 A)
+
 VIN channel resolution is 250 uA and mesaures up to 8A (short time, depending on the heat dissipation of your project)
 
 For more info see the user's manual in /doc.
