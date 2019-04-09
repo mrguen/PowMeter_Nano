@@ -1,0 +1,9 @@
+PowMeterNano	KEYWORD1
+
+begin	KEYWORD2
+measure	KEYWORD2
+getUSBVoltage()	KEYWORD2
+getUSBCurrent()	KEYWORD2
+getVINVoltage()	KEYWORD2
+getVINCurrent()	KEYWORD2
+ 	
