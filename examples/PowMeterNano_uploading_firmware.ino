@@ -22,7 +22,7 @@
  * Initialisation is done by begin() method. Measurement is triggered by measure() method. 
  * You can access voltage and current values by using getUSBVoltage(), getUSBCurrent(), getVINVoltage() and getVINCurrent()
  * 
- * You could also use the OLED to display whatever you want. See "Test_PowMeterNano_display.ino" example.
+ * You could also use the OLED to display whatever you want. See "PowMeterNano_OLED_test.ino" example.
  * 
  * It uses the library PowMeterNano.h that itslef includes
  *  - PowMeterNano_typedefs.h : defines a couple of enums used to pass I2C commands to the shield 
@@ -69,9 +69,9 @@ void loop() {
   PowMeterNano.measure(); // get the values and prints them to the OLED display.
   
   /*
-  myVar = getUSBVoltage();
-  myVar = getUSBCurrent();
-  myVar = getVINVoltage();
-  myVar = getVINCurrent();
+  myVar = PowMeterNano.getUSBVoltage();
+  myVar = PowMeterNano.getUSBCurrent();
+  myVar = PowMeterNano.getVINVoltage();
+  myVar = PowMeterNano.getVINCurrent();
   */
 }

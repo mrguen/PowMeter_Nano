@@ -38,12 +38,12 @@ void setup() {
   Serial.println("Begin setup");    
   Wire.begin (MY_ADDRESS);   
 
-  Serial.println("USB CURRENT OFFSET 0.25 mA");
-  error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_USB_CURRENT_OFFSET, 250);
+  Serial.println("USB CURRENT OFFSET xxx uA");
+  error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_USB_CURRENT_OFFSET, 20);
   if (error > 0) Serial.println(error);
 
-  Serial.println("VIN CURRENT OFFSET 0.02 mA");
-  error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_VIN_CURRENT_OFFSET, 20);
+  Serial.println("VIN CURRENT OFFSET xxx uA");
+  error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_VIN_CURRENT_OFFSET, 250);
   if (error > 0) Serial.println(error);
 
   Serial.println("End setup");    

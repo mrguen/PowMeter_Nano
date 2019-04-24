@@ -55,7 +55,7 @@ void setup() {
   Serial.begin(57600);
   Serial.println("Begin setup");    
   Wire.begin (MY_ADDRESS);   
-  
+
  // =============================================================================
   // QUERIES VALUES 
 
@@ -146,13 +146,12 @@ void setup() {
   // Deactivate alert
   sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_USB_HARD_ALERT, ALERT_OFF);
 
-
   // =============================================================================
   // POWER OFF
-
+  
   Serial.println("SHIELD OFF");
   sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_POWER, POWER_OFF);
-  delay(4000);
+  delay(6000);
 
   // Reactivate shield
   Serial.println("SHIELD ON");
@@ -184,7 +183,7 @@ void setup() {
 
   Serial.println("CHANGE I2C ADDRESS BACK TO DEFAULT");
   sendCmdToPowMeter(MY_ADDRESS, 0x20, SET_I2C_ADDRESS, POWER_METER_ADDRESS);
-  
+
 }
 
 void loop() {

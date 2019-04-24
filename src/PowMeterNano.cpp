@@ -7,8 +7,7 @@
  * It uses these libraries:
  *  - PowMeterNano_typedefs.h : defines a couple of enums used to pass I2C commands to the shield
  *  - INA226.h library from https://github.com/jarzebski/Arduino-INA226
- *  - "SSD1306Ascii.h", "SSD1306AsciiWire.h": these libraries are part of https://github.com/greiman/SSD1306Ascii and have been slightly modified in https://github.com/mrguen/SSD1306Ascii to provide a "big" but very lightweight numeric font
- *    (files: /src/fonts/CalBlk36nums.h, CalBlk36blank.h and allFonts.h)
+ *  - "SSD1306Ascii.h", "SSD1306AsciiWire.h": these libraries are part of https://github.com/greiman/SSD1306Ascii
  *  - LowPower library from https://github.com/rocketscream/Low-Power
  *  - EEPROMex.h library from http://thijs.elenbaas.net/2012/07/extended-eeprom-library-for-arduino
  *
@@ -40,8 +39,8 @@ byte PowMeterNanoClass::POW_METER_I2C_ADDRESS = 0x25; 						// Shield's MCU I2C 
 byte PowMeterNanoClass::readEEPROMinit = 0;                      	// to store the value read from EEPROM at address eeAddress
 
 // These offsets can be modified by an I2C command
-float PowMeterNanoClass::USBCurrentOffset = 0.03;									// USB current offset @ 5V. INA226 has a typical offset of +/- 0.0025 mV that gives +/- 0.025 mA error on a 0.1 Ohm current sense resistor
-float PowMeterNanoClass::VINCurrentOffset = 0.4;									// VIn current offset @ 12V
+float PowMeterNanoClass::USBCurrentOffset = 0.0;									// USB current offset @ 5V. INA226 has a typical offset of +/- 0.0025 mV that gives +/- 0.025 mA error on a 0.1 Ohm current sense resistor
+float PowMeterNanoClass::VINCurrentOffset = 0.0;									// VIn current offset @ 12V
 
 float PowMeterNanoClass::VUSB = 0.0;                              // USB Input voltage in V
 float PowMeterNanoClass::IUSB = 0.0;                           		// USB Measured current in mA
@@ -58,9 +57,6 @@ byte PowMeterNanoClass::display = BOTH;														// Defines the display layo
 
 byte PowMeterNanoClass::command = 0;                     					// Command received by I2C
 int PowMeterNanoClass::data = 0;                         					// Data associated to the command, received by I2C.
-
-// DEBUG
-int PowMeterNanoClass::alertCommand;
 
 //////////////////////////////////////
 // All these parameters can be modified by an I2C command
@@ -83,7 +79,8 @@ int PowMeterNanoClass::VINMaxCurrent = 3000;											// VIN maximum current th
 volatile bool PowMeterNanoClass::oledON =  true;			      			// OLED on / off
 volatile bool PowMeterNanoClass::deviceOFF = false;								// When putting the device into sleep
 
-bool PowMeterNanoClass::doMeasure = true ;                        // When "0" the program runs but measurements are suspended
+bool PowMeterNanoClass::halted = false ;                        	// When "1" the program runs but measurements are suspended
+bool PowMeterNanoClass::wasHalted = false ;                       // When "1" measurements were halted during the previous loop
 
 //////////////////////////////////////
 
@@ -179,68 +176,36 @@ void PowMeterNanoClass::requestEvent () {
 
     case SET_PERIOD:
 
-      if (data == SLEEP_120MS) {
-        period = (int)data;
-        Wire.write(0);
-      } else if (data == SLEEP_250MS) {
-        period = (int)data;
-        Wire.write(0);
-      } else if (data == SLEEP_500MS) {
+      if ((data == SLEEP_120MS) || (data == SLEEP_250MS) || (data == SLEEP_500MS) || (data == SLEEP_1S) || (data == SLEEP_2S) || (data == SLEEP_4S) || (data == SLEEP_8S)) {
         period = data;
-        Wire.write(0);
-      } else if (data == SLEEP_1S) {
-        period = (int)data;
-        Wire.write(0);
-      } else if (data == SLEEP_2S) {
-        period = (int)data;
-        Wire.write(0);
-      } else if (data == SLEEP_4S) {
-        period = (int)data;
-        Wire.write(0);
-      } else if (data == SLEEP_8S) {
-        period = (int)data;
+				mustUpdateEEPROM = true;
         Wire.write(0);
       } else {
         Wire.write(PERIOD_UNKNOWN);
       }
-
-			mustUpdateEEPROM = true;
       break;
 
     case SET_DISPLAY:
 
-      if (data < 4) {
+      if ((data == AUTO) || (data == USB) || (data == VIN) || (data == BOTH)) {
 				displayMode = data;
 				mustUpdateDisplay = true;
+				mustUpdateEEPROM = true;
         Wire.write(0);
       }
       else {
         Wire.write(DISPLAY_UNKNOWN);
       }
-
-			mustUpdateEEPROM = true;
       break;
 
     case SET_USB_SOFT_ALERT:
-
-    	if ((data == ALERT_OFF) || (data == UNDER_VOLTAGE) || (data == OVER_VOLTAGE) || (data == UNDER_CURRENT) || (data == OVER_CURRENT)) {
-				USBAlert = (bool)data;
-		    Wire.write(0);
-		  }
-		  else {
-		  	Wire.write(ALERT_UNKNOWN);
-      }
+			USBAlert = (bool)data;
+		  Wire.write(0);
 			break;
 
     case SET_VIN_SOFT_ALERT:
-
-    	if ((data == ALERT_OFF) || (data == UNDER_VOLTAGE) || (data == OVER_VOLTAGE) || (data == UNDER_CURRENT) || (data == OVER_CURRENT)) {
-				VINAlert = (bool)data;
-		    Wire.write(0);
-		  }
-		  else {
-		  	Wire.write(ALERT_UNKNOWN);
-      }
+			VINAlert = (bool)data;
+	    Wire.write(0);
 	    break;
 
     case SET_USB_MIN_VOLTAGE:
@@ -301,7 +266,8 @@ void PowMeterNanoClass::requestEvent () {
 
     case SET_USB_HARD_ALERT:
 
-    	if ((data == ALERT_OFF) || (data == UNDER_VOLTAGE) || (data == OVER_VOLTAGE) || (data == UNDER_CURRENT) || (data == OVER_CURRENT)) {
+    	if ((data == ALERT_OFF) ||  (data == UNDER_VOLTAGE) || (data == OVER_VOLTAGE) || (data == UNDER_CURRENT) || (data == OVER_CURRENT))
+    	{
 				mustUpdateAlertHardUSB = true;
 		    Wire.write(0);
 		  }
@@ -312,7 +278,8 @@ void PowMeterNanoClass::requestEvent () {
 
     case SET_VIN_HARD_ALERT:
 
-    	if ((data == ALERT_OFF) || (data == UNDER_VOLTAGE) || (data == OVER_VOLTAGE) || (data == UNDER_CURRENT) || (data == OVER_CURRENT)) {
+    	if ((data == ALERT_OFF) ||  (data == UNDER_VOLTAGE) || (data == OVER_VOLTAGE) || (data == UNDER_CURRENT) || (data == OVER_CURRENT))
+    	{
 				mustUpdateAlertHardVIN = true;
 		    Wire.write(0);
 		  }
@@ -323,13 +290,9 @@ void PowMeterNanoClass::requestEvent () {
 
     case GET_USB_VOLTAGE:
     	Wire.write((byte *) &VUSB, sizeof (VUSB));
-//      I2C_writeAnything(VUSB);
       break;
 
     case GET_USB_CURRENT:
-
-			// DEBUG
-			//mustDisplayIUSB = true;
 
     	Wire.write((byte *) &IUSB, sizeof (IUSB));
 
@@ -337,12 +300,10 @@ void PowMeterNanoClass::requestEvent () {
 
     case GET_VIN_VOLTAGE:
     	Wire.write((byte *) &VIn, sizeof (VIn));
-//      I2C_writeAnything(VIn);
       break;
 
     case GET_VIN_CURRENT:
     	Wire.write((byte *) &IIn, sizeof (IIn));
-//      I2C_writeAnything(IIn);
       break;
 
     case SET_POWER:
@@ -353,12 +314,12 @@ void PowMeterNanoClass::requestEvent () {
 
       } else if (data == POWER_ON) {
 				oledON = true;
-				doMeasure = true;
+				halted = false;
       	mustUpdateOledON = true;
         Wire.write(0);
 
       } else if (data == MEASUREMENT_HALT) {
-        doMeasure = false;
+        halted = true;
         Wire.write(0);
 
       } else if (data == OLED_OFF) {
@@ -423,9 +384,9 @@ void PowMeterNanoClass::requestEvent () {
 // Reads parameters in EEPROM and writes defaults to it if empty
 void PowMeterNanoClass::readAllFromEEPROM() {
 
-  readEEPROMinit = EEPROM.readByte(EEPROMbaseAddress);
-
   noInterrupts(); // To avoid datra being corrupted by I2C interrupt
+
+  readEEPROMinit = EEPROM.readByte(EEPROMbaseAddress);
 
   if (readEEPROMinit == EEPROMInit) {
 
@@ -445,24 +406,24 @@ void PowMeterNanoClass::readAllFromEEPROM() {
     VINMinCurrent = EEPROM.readInt(EEPROMbaseAddress+33);
     VINMaxCurrent = EEPROM.readInt(EEPROMbaseAddress+36);
 
-// Not implemented because the eeprom might be corrupted
-//		POW_METER_I2C_ADDRESS =  EEPROM.readByte(EEPROMbaseAddress+40);
+		POW_METER_I2C_ADDRESS =  EEPROM.readByte(EEPROMbaseAddress+40);
 
 		USBCurrentOffset = EEPROM.readFloat(EEPROMbaseAddress+41);
 		VINCurrentOffset = EEPROM.readFloat(EEPROMbaseAddress+45);
-
-		interrupts();
 
   } else {
     updateAllInEEPROM();
   }
 
-		interrupts();
+	interrupts();
+
 }
 
 // ****************************************************************
 // Writes all parameters to EEPROM
 void PowMeterNanoClass::updateAllInEEPROM() {
+
+ 	noInterrupts(); // To avoid datra being corrupted by I2C interrupt
 
   EEPROM.updateByte(EEPROMbaseAddress,EEPROMInit);
 
@@ -482,12 +443,12 @@ void PowMeterNanoClass::updateAllInEEPROM() {
   EEPROM.updateInt(EEPROMbaseAddress+32, VINMinCurrent);
   EEPROM.updateInt(EEPROMbaseAddress+36, VINMaxCurrent);
 
-// Not implemented because the eeprom might be corrupted
-//  EEPROM.updateByte(EEPROMbaseAddress+40, POW_METER_I2C_ADDRESS);
+  EEPROM.updateByte(EEPROMbaseAddress+40, POW_METER_I2C_ADDRESS);
 
   EEPROM.updateFloat(EEPROMbaseAddress+41, USBCurrentOffset);
   EEPROM.updateFloat(EEPROMbaseAddress+45, VINCurrentOffset);
 
+	interrupts();
 }
 
 
@@ -522,9 +483,6 @@ void PowMeterNanoClass::getValues() {
 
   IUSB = 1000 * INA226_USB.readShuntVoltage() / rsenseUSB + USBCurrentOffset;
   IIn = 1000 * INA226_VIN.readShuntVoltage() / rsenseVIN + VINCurrentOffset;
-
-	// debug
-	//tampon = IUSB;
 
   VUSB = INA226_USB.readBusVoltage();
   VIn = INA226_VIN.readBusVoltage();
@@ -610,19 +568,12 @@ void PowMeterNanoClass::displayAlert(String msgLine1, float number ) {
 // with bigger font
 void PowMeterNanoClass::displayUSB() {
 
-	bool clearOLED = false;
-
-	if ((previousIUSB>= 1000.0) and (IUSB<1000.0)) clearOLED = true;
-	if ((previousIUSB< 100.0) and (IUSB>100.0)) clearOLED = true;
-
-//	if (clearOLED)  oled.clear(10,64,0,3);
-	if (clearOLED)  displayContext();
-
 	oled.set2X();
 	oled.setCursor(10,0);
   oled.print(VUSB, nbDecimals(VUSB));
 	oled.setCursor(10,2);
-  oled.println(IUSB, nbDecimals(IUSB));
+  oled.print(IUSB, nbDecimals(IUSB));
+  oled.println("  ");
 	oled.set1X();
 
 }
@@ -632,19 +583,12 @@ void PowMeterNanoClass::displayUSB() {
 // with bigger font
 void PowMeterNanoClass::displayVIN() {
 
-	bool clearOLED = false;
-
-	if ((previousIIn>= 1000.0) and (IIn<1000.0)) clearOLED = true;
-	if ((previousIIn< 100.0) and (IIn>100.0)) clearOLED = true;
-
-//	if (clearOLED)  oled.clear(10,64,0,3);
-	if (clearOLED)  displayContext();
-
 	oled.set2X();
 	oled.setCursor(10,0);
   oled.print(VIn, nbDecimals(VIn));
 	oled.setCursor(10,2);
-  oled.println(IIn, nbDecimals(IIn));
+  oled.print(IIn, nbDecimals(IIn));
+  oled.print("  ");
 	oled.set1X();
 
 }
@@ -654,25 +598,17 @@ void PowMeterNanoClass::displayVIN() {
 // Default display of both USB and VIN values on one screen
 void PowMeterNanoClass::displayBoth() {
 
-	bool clearOLED = false;
-
-	if ((previousIUSB>= 1000.0) and (IUSB<1000.0)) clearOLED = true;
-	if ((previousIUSB< 100.0) and (IUSB>100.0)) clearOLED = true;
-	if ((previousIIn>= 1000.0) and (IIn<1000.0)) clearOLED = true;
-	if ((previousIIn< 100.0) and (IIn>100.0)) clearOLED = true;
-
-//	if (clearOLED) oled.clear(0,64,1,3);
-	if (clearOLED)  displayContext();
-
   oled.setCursor(0,2);
   oled.print(VUSB, nbDecimals(VUSB));
   oled.setCursor(0,3);
-  oled.println(IUSB, nbDecimals(IUSB));
+  oled.print(IUSB, nbDecimals(IUSB));
+  oled.print("  ");
 
   oled.setCursor(32,2);
   oled.print(VIn, nbDecimals(VIn));
   oled.setCursor(32,3);
-  oled.println(IIn, nbDecimals(IIn));
+  oled.print(IIn, nbDecimals(IIn));
+  oled.print("  ");
 
 }
 
@@ -681,12 +617,19 @@ void PowMeterNanoClass::displayBoth() {
 // ****************************************************************
 void PowMeterNanoClass::begin() {
 
+  bool reset = false;
 
-	// A VOIR SI ON PEUT MIEUX FAIRE POUR EVITER LES BEGIN MULTIPLES
-	//noInterrupts();
+	// Keep this sleep period used in some regular cases to avoid multiple partial execution of begin()
+	// For example when powering the Nano + shield on the Nano USB connector, the USB com establishing
+	// triggers a couple of resets that will be masked by this sleep period.
+	LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_ON);
 
-  //interrupts();
-
+	// Saving as much power as possible
+	power_adc_disable();
+	power_usart0_disable();
+	power_spi_disable();
+	power_timer1_disable();
+	power_timer2_disable();
 
 	// All unused pins stick to vcc
 	for (int i = 0; i <= 10; i++){
@@ -697,16 +640,15 @@ void PowMeterNanoClass::begin() {
 		pinMode(i, INPUT_PULLUP);
 	}
 
-	// Keep this sleep period used in some regular cases to avoid multiple partial execution of begin()
-	// For example when powering the Nano + shield on the Nano USB connector, the USB com establishing
-	// triggers a couple of resets that will be masked by this sleep period.
-	LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_ON);
-
-	// used in DEBUG to reset the EEPROM
-	 updateAllInEEPROM();
-
-	// Loads saved parameters
-  readAllFromEEPROM();
+	// Hardware reset: If PC2 is low the device must be reset to default parameters.
+	if (digitalRead(16) == LOW) {
+		updateAllInEEPROM();
+		reset = true;
+	}
+	else {
+		// Loads saved parameters
+	  readAllFromEEPROM();
+	}
 
   // These attachements of handlers must be specified before calling begin(address)
   // Because begin(address) does the attachment
@@ -715,7 +657,7 @@ void PowMeterNanoClass::begin() {
   Wire.onRequest (requestEvent);  		// interrupt handler for data request
 
   Wire.begin(POW_METER_I2C_ADDRESS);	// Begins in multi master mode
-//  Wire.setClock(400000L);						// Could try in I2C high speed to increase OLED frame rate but seemed to generate too many faults.
+  //Wire.setClock(400000L);						// Could try in I2C high speed to increase OLED frame rate but seemed to generate too many faults.
 
 	// INA226 INIT
 	INA226_USB.begin(INA_USB_ADDRESS);
@@ -730,25 +672,13 @@ void PowMeterNanoClass::begin() {
 	oled.begin(&SSD1306_64x32, OLED_ADDRESS);
 	oled.setFont(lcd5x7);
 
+	if (reset) {
+		oled.setCursor(0,0);
+		oled.println("HARD RST");
+		delay(2000);
+	}
+
   displayContext();
-
-  // TESTS
-//  INA226_VIN.enableShuntOverLimitAlert();
-//  INA226_VIN.setMaskEnable(1000000000000000);
-//  INA226_VIN.setShuntVoltageLimit(0.012);
-
-//	setAlert(INA226_VIN, 0, ALERT_OFF);
-//	setAlert(INA226_VIN, 11, INA226_BIT_BUL);
-//	setAlert(INA226_VIN, 11.5, INA226_BIT_BOL);
-//	setAlert(INA226_VIN, 0.01, INA226_BIT_SUL);
-//	setAlert(INA226_VIN, 0.012, INA226_BIT_SOL);
-
-//	setAlert(INA226_USB, 6, INA226_BIT_BUL);
-//	setAlert(INA226_USB, 5, INA226_BIT_BOL);
-//	setAlert(INA226_USB, 0, ALERT_OFF);
-
-//  setAlert(INA226_USB, 0.01, INA226_BIT_SUL);
-//	setAlert(INA226_USB, 0.01, INA226_BIT_SOL);
 
 }
 
@@ -757,21 +687,6 @@ void PowMeterNanoClass::begin() {
 // ****************************************************************
 // The method to call in the program loop to query, compute and display values
 void PowMeterNanoClass::measure() {
-
-
-/* DEBUG
-if (mustDisplayIUSB == true ) {
-
-			oled.clear();
-			oled.setCursor(0,0);
-  		oled.print("I: ");
-			oled.setCursor(32,0);
-  		oled.println(tampon, nbDecimals(tampon));
-			delay(2000);
-			mustDisplayIUSB = false;
-
-}
-*/
 
 	alert = false;
 
@@ -783,9 +698,6 @@ if (mustDisplayIUSB == true ) {
   	mustUpdateOledON = false;
 
   }
-
-// DEBUG !!! VIN
-//setAlert(INA226_VIN, 0, 0);
 
 	if (mustUpdateAlertHardUSB) {
 
@@ -801,22 +713,6 @@ if (mustDisplayIUSB == true ) {
 
   if (mustUpdateAlertHardVIN) {
 
-//	oled.setCursor(42,0);
-//	oled.print("UP");
-//	oled.print(VINMinVoltage,1);
-
-//			setAlert(INA226_VIN, 0, 0);
-//			setAlert(INA226_VIN, VINMinVoltage, INA226_BIT_BUL);
-
-//		if (alertCommand == ALERT_OFF) 				setAlert(INA226_VIN, 0, 0);
-
-//		if (alertCommand == UNDER_VOLTAGE) 		setAlert(INA226_VIN, VINMinVoltage, INA226_BIT_BUL);
-
-
-//		if (alertCommand == OVER_VOLTAGE) 		setAlert(INA226_VIN, VINMaxVoltage, INA226_BIT_BOL);
-//		if (alertCommand == UNDER_CURRENT) 		setAlert(INA226_VIN, VINMinCurrent * rsenseVIN * 0.001, INA226_BIT_SUL);
-//		if (alertCommand == OVER_CURRENT) 		setAlert(INA226_VIN, VINMaxCurrent * rsenseVIN * 0.001, INA226_BIT_SOL);
-
 		switch(data) {
 			case ALERT_OFF: 		setAlert(INA226_VIN, 0, 0); break;
 			case UNDER_VOLTAGE: setAlert(INA226_VIN, VINMinVoltage, INA226_BIT_BUL); break;
@@ -827,26 +723,16 @@ if (mustDisplayIUSB == true ) {
     mustUpdateAlertHardVIN = false;
 	}
 
-
-// DEBUG
-//	setAlert(INA226_VIN, VINMaxVoltage, INA226_BIT_BOL);
-
   if (mustUpdateEEPROM) {
     updateAllInEEPROM();
     mustUpdateEEPROM = false;
   }
 
-/*
-	oled.setCursor(0,0);
-	oled.print(i);
-	i++;
-	oled.setCursor(16,0);
-	oled.print(data,DEC);
-	oled.setCursor(24,0);
-	oled.print(mustUpdateAlertHardVIN);
-*/
+  if (halted) { // Does not measure anything while in HALT mode
+		if (wasHalted == false) {wasHalted = true;}
+	} else {
 
-  if (doMeasure) { // Does not measure anything while in HALT mode
+		if (wasHalted == true) {mustUpdateDisplay = true; wasHalted = false;}
 
 	  getValues();
 
@@ -887,11 +773,11 @@ if (mustDisplayIUSB == true ) {
 			}
 
 			if (displayMode == AUTO) {
-				if ((IUSB > 0.1) and (IIn > 0.1)) {
+				if ((IUSB > 0.02) and (IIn > 0.2)) {
 					if (display != BOTH) mustUpdateDisplay = true;
 					display = BOTH;
 				}
-				else if (IIn > 0.1) {
+				else if (IIn > 0.2) {
 					if (display != VIN) mustUpdateDisplay = true;
 					display = VIN;
 				}
@@ -925,8 +811,12 @@ if (mustDisplayIUSB == true ) {
 		INA226_USB.configure(INA226_AVERAGES_16, INA226_BUS_CONV_TIME_1100US, INA226_SHUNT_CONV_TIME_1100US, INA226_MODE_POWER_DOWN);
 	  INA226_VIN.configure(INA226_AVERAGES_16, INA226_BUS_CONV_TIME_1100US, INA226_SHUNT_CONV_TIME_1100US, INA226_MODE_POWER_DOWN);
 		oled.ssd1306WriteCmd(SSD1306_DISPLAYOFF);
-		delay(1000); // Mandatory to wait that I2C operations are finished otherwise it might wake up the device unfortunately
+
+		wdt_disable(); // Probably should be called in LowPower so might be removed if LowPower library is modified.
 		LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_ON);
+
+		// Wakes up here
+
 		oled.ssd1306WriteCmd(SSD1306_DISPLAYON);
 		deviceOFF = false;
 	}
@@ -936,7 +826,6 @@ if (mustDisplayIUSB == true ) {
 
   // Triggering another measurement.
   launchMeasurement();
-  //delay(50);
 }
 
 

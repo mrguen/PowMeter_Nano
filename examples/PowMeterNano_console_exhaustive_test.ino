@@ -46,7 +46,7 @@ void setup() {
 
   // =============================================================================
   // PERIOD
-  
+
   Serial.println("MEASUREMENT DELAY 0.12 SECONDS");
   error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_PERIOD, SLEEP_120MS);
   if (error > 0) Serial.println(error);
@@ -81,7 +81,6 @@ void setup() {
   error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_PERIOD, SLEEP_1S);
   if (error > 0) Serial.println(error);
 
-  
   // =============================================================================
   // DISPLAY 
 
@@ -95,16 +94,17 @@ void setup() {
   if (error > 0) Serial.println(error);
   delay(4000);
 
-  Serial.println("DISPLAY AUTO");
-  error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_DISPLAY, AUTO);
-  if (error > 0) Serial.println(error);
-  delay(4000);
-
   // Back to display both
   Serial.println("DISPLAY BOTH");
   error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_DISPLAY, BOTH);
   if (error > 0) Serial.println(error);
   delay(4000);
+
+  Serial.println("DISPLAY AUTO");
+  error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_DISPLAY, AUTO);
+  if (error > 0) Serial.println(error);
+  delay(4000);
+
 
   // =============================================================================  
   // SOFTWARE ALERT 
@@ -370,7 +370,8 @@ void setup() {
  
   error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_POWER, POWER_ON);
   if (error > 0) Serial.println(error);
- 
+  delay(4000);
+   
   // =============================================================================
   // CUSTOM I2C ADDRESS
 
@@ -402,7 +403,8 @@ void setup() {
 
   // =============================================================================
   // CURRENT OFFSET
-
+  // Might need to calibrate your device again if you test this
+  /*
   Serial.println("USB CURRENT OFFSET - 10 mA");
   error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_USB_CURRENT_OFFSET, -10000);
   if (error > 0) Serial.println(error);
@@ -421,7 +423,7 @@ void setup() {
   Serial.println("VIN CURRENT OFFSET 0 mA");
   error = sendCmdToPowMeter(MY_ADDRESS, POWER_METER_ADDRESS, SET_VIN_CURRENT_OFFSET, 0);
   if (error > 0) Serial.println(error);
-
+*/
   Serial.println("End setup");    
 }
 

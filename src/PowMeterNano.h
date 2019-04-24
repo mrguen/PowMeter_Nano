@@ -7,8 +7,7 @@
  * It uses these libraries:
  *  - PowMeterNano_typedefs.h : defines a couple of enums used to pass I2C commands to the shield
  *  - INA226.h library from https://github.com/jarzebski/Arduino-INA226
- *  - "SSD1306Ascii.h", "SSD1306AsciiWire.h": these libraries are part of https://github.com/greiman/SSD1306Ascii and have been slightly modified in https://github.com/mrguen/SSD1306Ascii to provide a "big" but very lightweight numeric font
- *    (files: /src/fonts/CalBlk36nums.h, CalBlk36blank.h and allFonts.h)
+ *  - "SSD1306Ascii.h", "SSD1306AsciiWire.h": these libraries are part of https://github.com/greiman/SSD1306Ascii
  *  - LowPower library from https://github.com/rocketscream/Low-Power
  *  - EEPROMex.h library from http://thijs.elenbaas.net/2012/07/extended-eeprom-library-for-arduino
  *
@@ -29,8 +28,9 @@
 #include "SSD1306Ascii.h"
 #include "SSD1306AsciiWire.h"
 #include "LowPower.h"
+#include <avr/power.h>
+#include <avr/wdt.h>
 #include <EEPROMex.h>
-//#include <I2C_Anything.h>
 
 #include "PowMeterNano_typedefs.h"
 
@@ -56,10 +56,6 @@ class PowMeterNanoClass
  	static float getVINCurrent();
 
   private:
-
-	// DEBUG
-	//static volatile bool mustDisplayIUSB;
-	//static volatile float tampon;
 
 	static float VUSB;
 	static float IUSB;
@@ -95,9 +91,6 @@ class PowMeterNanoClass
 	static byte command;									// Not volatiles since not modified outside the handler
 	static int data;
 
-	//DEBUG
-	static int alertCommand;
-
 	static volatile int period;
 	static volatile byte displayMode;
 
@@ -114,7 +107,8 @@ class PowMeterNanoClass
   static int VINMinCurrent;
   static int VINMaxCurrent;
 
-	static bool doMeasure;
+	static bool halted;
+  static bool wasHalted;
   static bool alert;
   static bool formerAlert;
 

@@ -41,7 +41,7 @@ byte sendCmdToPowMeter (const byte myAddress, const byte powMeter_address, const
   	return result;
   }
 
-	delay(100); // Keep it to give some time for the shield to treat the event
+	delay(100); // Keep it to a minimum of 100 to ms give some time for the shield to treat the event
 
   int counter = 0;
 
